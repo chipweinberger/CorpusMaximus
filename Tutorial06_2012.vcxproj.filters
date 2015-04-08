@@ -15,6 +15,7 @@
     <ClCompile Include="Oculus.cpp" />
     <ClCompile Include="CKinect.cpp" />
     <ClCompile Include="MainRender.cpp" />
+    <ClCompile Include="fromGithub.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CLInclude Include="resource.h">

@@ -402,6 +402,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CKinect.cpp" />
+    <ClCompile Include="fromGithub.cpp" />
     <ClCompile Include="MainRender.cpp" />
     <ClCompile Include="Oculus.cpp" />
     <ClCompile Include="Tutorial06.cpp" />
