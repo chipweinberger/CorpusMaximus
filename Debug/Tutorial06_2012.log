@@ -1,21 +1,23 @@
-﻿Build started 4/8/2015 3:12:21 AM.
+﻿Build started 4/9/2015 5:12:42 PM.
      1>Project "C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Tutorial06_2012.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\Program Files\ovr_sdk_win_0.4.4\OculusSDK\LibOVR\Src" /I"C:\Program Files\ovr_sdk_win_0.4.4\OculusSDK\LibOVR\Include" /ZI /nologo /W4 /WX- /Od /Oi /Oy- /D WIN32 /D _DEBUG /D DEBUG /D PROFILE /D _WINDOWS /D _WIN32_WINNT=0x0600 /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /arch:SSE2 /fp:fast /Zc:wchar_t /Zc:forScope /openmp- /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt  fromGithub.cpp
          fromGithub.cpp
-     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(256): warning C4189: 'windowed' : local variable is initialized but not referenced
-     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(374): warning C4100: 'szFileName' : unreferenced formal parameter
-     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(855): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(249): warning C4100: 'b_pt2' : unreferenced formal parameter
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(249): warning C4100: 'a_pt2' : unreferenced formal parameter
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(286): warning C4189: 'windowed' : local variable is initialized but not referenced
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(416): warning C4100: 'szFileName' : unreferenced formal parameter
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(932): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\lw520\documents\oculus dev\tutorial06\fromgithub.cpp(933): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
        Link:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Debug\Tutorial06.exe" /INCREMENTAL /NOLOGO /LIBPATH:"C:\Program Files\Microsoft SDKs\Kinect\v2.0_1409\Lib\x64" ws2_32.lib Dbghelp.lib dxgi.lib dxguid.lib d3d10.lib d3d11.lib d3dcompiler.lib winmm.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib comctl32.lib "C:\Program Files\Microsoft SDKs\Kinect\v2.0_1409\\lib\x86\libovrd.lib" "C:\Program Files\Microsoft SDKs\Kinect\v2.0_1409\\lib\x86\kinect20.lib" kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /manifestinput:"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\Include\Manifest\dpiaware.manifest" /DEBUG /PDB:"C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Debug\Tutorial06.pdb" /SUBSYSTEM:WINDOWS /LARGEADDRESSAWARE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Debug\Tutorial06.lib" /MACHINE:X86 /SAFESEH  Debug\Tutorial06.res
          Debug\CKinect.obj
          Debug\fromGithub.obj
          Debug\MainRender.obj
-         Debug\Oculus.obj
          Debug\Tutorial06.obj
          Tutorial06_2012.vcxproj -> C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Debug\Tutorial06.exe
      1>Done Building Project "C:\Users\LW520\Documents\Oculus Dev\Tutorial06\Tutorial06_2012.vcxproj" (Build target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:01.60
+Time Elapsed 00:00:01.53

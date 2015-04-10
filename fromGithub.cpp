@@ -26,6 +26,9 @@
 #define OVR_D3D_VERSION 11
 #include <OVR_CAPI_D3D.h>
 
+using namespace std;
+#include <iostream>
+
 #include "CKinect.h"
 
 using namespace DirectX;
@@ -81,7 +84,7 @@ PS_INPUT VS( VS_INPUT input )
 //--------------------------------------------------------------------------------------
 float4 PS( PS_INPUT input) : SV_Target
 {
-    float4 finalColor = float4(0.5,0.5,0.5,0.5);
+    float4 finalColor = float4(0.9,0.9,0.9,0.9);
     finalColor.a = 1;
     return finalColor;
 }
@@ -134,6 +137,8 @@ ID3D11Buffer*           g_pIndexBuffer = nullptr;
 ID3D11Buffer*           g_pConstantBuffer = nullptr;
 XMMATRIX                g_World;
 XMMATRIX                g_View;
+
+bool					in_calibration = false;
 
 
 //------------------------------------------------------------
@@ -220,7 +225,7 @@ void SetMaxFrameLatency(int value) {
 //----------------------------------------------------------------------------------------------------------
 void ClearAndSetRenderTarget(ID3D11RenderTargetView * rendertarget,
 	ImageBuffer * depthbuffer, ovrRecti vp) {
-	float black[] = { 0, 0, 0, 1 };
+	float black[] = { 0, 0, 0, 1}; 
 	g_pImmediateContext->OMSetRenderTargets(1, &rendertarget, depthbuffer->TexDsv);
 	g_pImmediateContext->ClearRenderTargetView(rendertarget, black);
 	g_pImmediateContext->ClearDepthStencilView(depthbuffer->TexDsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
@@ -229,6 +234,31 @@ void ClearAndSetRenderTarget(ID3D11RenderTargetView * rendertarget,
 	D3Dvp.MinDepth = 0;              D3Dvp.MaxDepth = 1;
 	D3Dvp.TopLeftX = (float)vp.Pos.x;    D3Dvp.TopLeftY = (float)vp.Pos.y;
 	g_pImmediateContext->RSSetViewports(1, &D3Dvp);
+}
+
+
+
+XMFLOAT3 kinect_point1;
+XMFLOAT3 kinect_point2;
+
+XMFLOAT3 oculus_point1;
+XMFLOAT3 oculus_point2;
+
+XMMATRIX calibration_matrix;
+
+XMMATRIX tranform_matrix_from_points(XMFLOAT3 a_pt1, XMFLOAT3 a_pt2, XMFLOAT3 b_pt1, XMFLOAT3 b_pt2){
+
+	//first get translation matrix
+	XMMATRIX translation = XMMatrixTranslation(a_pt1.x - b_pt1.x, a_pt1.y - b_pt1.y, a_pt1.z - b_pt1.z);
+
+	//next get roation matrix
+	return translation;
+
+}
+
+void calibrate(){
+	//kinect_point1 = 
+
 }
 
 
@@ -301,15 +331,23 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 	for (int eye = 0; eye < 2; eye++) {
 		useHmdToEyeViewOffset[eye] = EyeRenderDesc[eye].HmdToEyeViewOffset;
-		eyeProjections[eye] = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, 0.01f, 100.0f, false);
+		eyeProjections[eye] = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, 0.1f, 100.0f, false);
 	}
 
 	// Main message loop
 	MSG msg = { 0 };
 	while (WM_QUIT != msg.message) {
 
+		SetWindowPos(g_hWnd, HWND_TOPMOST, HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h, NULL);
+
 		//updatekinect stuff
 		update();
+
+
+
+		if (in_calibration){
+			calibrate();
+		}
 
 		g_pImmediateContext->UpdateSubresource(g_pVertexBuffer, 0, 0, kinectVerticies, cDepthHeight * cDepthWidth * sizeof(CameraSpacePoint), 0);
 
@@ -349,14 +387,18 @@ HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow) {
 	if (!RegisterClassEx(&wcex))
 		return E_FAIL;
 
-	// Create window
+	// Create window 
 	g_hInst = hInstance;
-	RECT rc = { 0, 0, 800, 600 };
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	g_hWnd = CreateWindow(L"TutorialWindowClass", L"Direct3D 11 Tutorial 6",
-				WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	g_hWnd = CreateWindowEx(WS_EX_LAYERED, L"TutorialWindowClass", L"Direct3D 11 Tutorial 6",
+		WS_POPUP | WS_GROUP,
 				HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h, nullptr, nullptr, hInstance,
 				nullptr);
+	//SetWindowLong(g_hWnd, GWL_EXSTYLE, GetWindowLong(g_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+
+	// Make red pixels transparent:
+	SetLayeredWindowAttributes(g_hWnd, RGB(0, 0, 0), 100, LWA_COLORKEY);
+	//SetLayeredWindowAttributes(g_hWnd, RGB(0, 0, 0), 100, LWA_ALPHA);
+
 	if (!g_hWnd)
 		return E_FAIL;
 
@@ -689,6 +731,8 @@ HRESULT InitDevice(ovrSizei size) {
 	// Set primitive topology
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	//g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
 	// Create the constant buffer
 	bd.Usage = D3D11_USAGE_DEFAULT;
 	bd.ByteWidth = sizeof(ConstantBuffer);
@@ -702,8 +746,17 @@ HRESULT InitDevice(ovrSizei size) {
 	g_World = XMMatrixIdentity();
 
 	// Initialize the view matrix
-	XMVECTOR Eye = XMVectorSet(-0.1f, 0.08f, -2.2f, 0.0f);
-	XMVECTOR At = XMVectorSet(6.0f, 0.0f, -2.0f, 0.0f);
+
+	XMVECTOR Eye;
+	CameraSpacePoint head_pos_from_kinect;//round about stuff (ptr) to enable returning null, ughh
+	CameraSpacePoint *head_pos_from_kinect_ptr = &head_pos_from_kinect;
+	get_head_position(head_pos_from_kinect_ptr);
+
+	if (head_pos_from_kinect_ptr != 0)
+		Eye = XMVectorSet(head_pos_from_kinect.X, head_pos_from_kinect.Y, head_pos_from_kinect.Z, 0.0f);
+
+	Eye = XMVectorSet(-0.2f, 0.1f, -1.9f, 0.0f);
+	XMVECTOR At = XMVectorSet(-0.2f, 0.1f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	g_View = XMMatrixLookAtLH(Eye, At, Up);
 
@@ -749,6 +802,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 		switch (wParam){
 			case'R':
 				ovrHmd_RecenterPose(HMD);
+				break;
+			case'C':
+				in_calibration = true;
 				break;
 		}
 		break;
@@ -821,7 +877,24 @@ void Render(const ovrPosef & ovrPose, const ovrMatrix4f & ovrProjection) {
 	cb1.mWorld = XMMatrixTranspose(g_World);
 
 	XMMATRIX pose = toXM(ovrPose);
-	XMMATRIX currentView = XMMatrixMultiply(g_View, pose);
+
+	//set g_view errtime TEMPORARY CODE
+	//XMVECTOR Eye;
+	//CameraSpacePoint head_pos_from_kinect;//round about stuff (ptr) to enable returning null, ughh
+	//CameraSpacePoint *head_pos_from_kinect_ptr = &head_pos_from_kinect;
+	//get_head_position(head_pos_from_kinect_ptr);
+	//
+	//if (head_pos_from_kinect_ptr != 0)
+	//	Eye = XMVectorSet(head_pos_from_kinect.X, head_pos_from_kinect.Y, head_pos_from_kinect.Z, 0.0f);
+	//else
+	//	Eye = XMVectorSet(-0.1f, 0.08f, -2.2f, 0.0f);
+	//XMVECTOR At = XMVectorSet(6.0f, 0.0f, -2.0f, 0.0f);
+	//XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	//g_View = XMMatrixLookAtLH(Eye, At, Up);
+	//END OF TEMPORARY CODE
+
+
+ 	XMMATRIX currentView = XMMatrixMultiply(g_View, pose);
 	//currentView = XMMatrixMultiply(XMMatrixScaling(2, 2, 2), currentView);
 	cb1.mView = XMMatrixTranspose(currentView);
 
@@ -845,14 +918,19 @@ void Render(const ovrPosef & ovrPose, const ovrMatrix4f & ovrProjection) {
 	g_pImmediateContext->DrawIndexed((cDepthWidth * cDepthHeight * 6), 0, 0);
 
 
-}
+}  
 
 void RenderFrame() {
 	ovrPosef temp_EyeRenderPose[2];
 	ovrHmd_GetEyePoses(HMD, 0, useHmdToEyeViewOffset, temp_EyeRenderPose, NULL);
 	//flip z
 	for (int i = 0; i < 2; ++i){
+		//tracking done on kinect for now
+		//char msgbuf[1000];
+		//sprintf(msgbuf, "x: %f y:%f z:%f\n", temp_EyeRenderPose[i].Position.x, temp_EyeRenderPose[i].Position.y, temp_EyeRenderPose[i].Position.z);
+		//OutputDebugStringA(msgbuf);
 		temp_EyeRenderPose[i].Position.x = temp_EyeRenderPose[i].Position.x * -1.0;
+		temp_EyeRenderPose[i].Position.y = temp_EyeRenderPose[i].Position.y * -1.0;
 	}
 
 

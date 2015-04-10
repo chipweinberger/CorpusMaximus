@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Tutorial06.cpp" />
-    <ClCompile Include="Oculus.cpp" />
     <ClCompile Include="CKinect.cpp" />
     <ClCompile Include="MainRender.cpp" />
     <ClCompile Include="fromGithub.cpp" />
@@ -25,7 +24,6 @@
       <Filter>Resource Files</Filter>
     </ResourceCompile>
     <ClInclude Include="CKinect.h" />
-    <ClInclude Include="Oculus.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Tutorial06.fx">

@@ -17,5 +17,6 @@ extern CameraSpacePoint kinectVerticies[cDepthHeight*cDepthWidth];
 
 HRESULT InitializeDefaultSensor();
 void update();
+void get_head_position(CameraSpacePoint* &ret_val);
 
 #endif

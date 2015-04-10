@@ -24,6 +24,10 @@ IMultiSourceFrameReader*m_pMultiSourceFrameReader;
 // Depth reader
 IDepthFrameReader*      m_pDepthFrameReader;
 
+//body reader
+IBodyFrameReader * body_rdr;
+IBodyFrameSource * body_src;
+
 RGBQUAD * m_pDepthRGBX[cDepthWidth * cDepthHeight];
 
 //kinect vertex buffer
@@ -38,6 +42,59 @@ inline void SafeRelease(Interface *& pInterfaceToRelease)
 		pInterfaceToRelease->Release();
 		pInterfaceToRelease = NULL;
 	}
+}
+
+void get_head_position(CameraSpacePoint* &ret_val){
+
+	CameraSpacePoint* temp = ret_val;
+	ret_val = 0;//starts as null
+
+	IBodyFrame* pBodyFrame = NULL;
+
+	HRESULT hr = body_rdr->AcquireLatestFrame(&pBodyFrame);
+
+	if (SUCCEEDED(hr))
+	{
+		INT64 nTime = 0;
+
+		hr = pBodyFrame->get_RelativeTime(&nTime);
+
+		IBody* ppBodies[BODY_COUNT] = { 0 };
+
+		if (SUCCEEDED(hr))
+		{
+			hr = pBodyFrame->GetAndRefreshBodyData(_countof(ppBodies), ppBodies);
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			if (_countof(ppBodies) > 0){
+
+				BOOLEAN bTracked = false;
+				hr = ppBodies[0]->get_IsTracked(&bTracked);
+
+				if (SUCCEEDED(hr) && bTracked)
+				{
+					Joint joints[JointType_Count];
+					hr = ppBodies[0]->GetJoints(_countof(joints), joints);
+
+					if (SUCCEEDED(hr))
+					{
+						*temp = joints[JointType_Head].Position;
+						ret_val = temp;//becomes not null if success
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < _countof(ppBodies); ++i)
+		{
+			SafeRelease(ppBodies[i]);
+		}
+	}
+
+	SafeRelease(pBodyFrame);
+
 }
 
 void update()
@@ -140,6 +197,8 @@ HRESULT InitializeDefaultSensor()
 
 		hr = m_pKinectSensor->Open();
 
+		//depth
+
 		if (SUCCEEDED(hr))
 		{
 			hr = m_pKinectSensor->get_DepthFrameSource(&pDepthFrameSource);
@@ -150,24 +209,21 @@ HRESULT InitializeDefaultSensor()
 			hr = pDepthFrameSource->OpenReader(&m_pDepthFrameReader);
 		}
 
+		//body
+
+		if (SUCCEEDED(hr))
+		{
+			hr = m_pKinectSensor->get_BodyFrameSource(&body_src);
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			hr = body_src->OpenReader(&body_rdr);
+		}
+
 		SafeRelease(pDepthFrameSource);
 	}
 
 	return hr;
 }
 
-
-
-/*
-*
-*/
-int main(int argc, char** argv) {
-
-	InitializeDefaultSensor();
-	while (true){
-		update();
-	}
-
-
-	return 0;
-}
