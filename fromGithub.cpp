@@ -19,6 +19,8 @@
 //--------------------------------------------------------------------------------------
 
 #include <windows.h>
+#define NTDDI_VERSION 0x06030000
+#include <dcomp.h>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <directxmath.h>
@@ -84,18 +86,8 @@ PS_INPUT VS( VS_INPUT input )
 //--------------------------------------------------------------------------------------
 float4 PS( PS_INPUT input) : SV_Target
 {
-    float4 finalColor = float4(0.9,0.9,0.9,0.9);
-    finalColor.a = 1;
+    float4 finalColor = float4(0.9,0.9,0.9,1.0);
     return finalColor;
-}
-
-
-//--------------------------------------------------------------------------------------
-// PSSolid - render a solid color
-//--------------------------------------------------------------------------------------
-float4 PSSolid( PS_INPUT input) : SV_Target
-{
-    return vOutputColor;
 }
 )V0G0N";
 
@@ -121,9 +113,9 @@ D3D_DRIVER_TYPE         g_driverType = D3D_DRIVER_TYPE_NULL;
 D3D_FEATURE_LEVEL       g_featureLevel = D3D_FEATURE_LEVEL_11_0;
 ID3D11Device*           g_pd3dDevice = nullptr;
 ID3D11Device1*          g_pd3dDevice1 = nullptr;
+IDCompositionDevice*	dcompDevice;
 ID3D11DeviceContext*    g_pImmediateContext = nullptr;
 ID3D11DeviceContext1*   g_pImmediateContext1 = nullptr;
-IDXGISwapChain*         g_pSwapChain = nullptr;
 IDXGISwapChain1*        g_pSwapChain1 = nullptr;
 ID3D11RenderTargetView* g_pRenderTargetView = nullptr;
 ID3D11Texture2D*        g_pDepthStencil = nullptr;
@@ -225,7 +217,7 @@ void SetMaxFrameLatency(int value) {
 //----------------------------------------------------------------------------------------------------------
 void ClearAndSetRenderTarget(ID3D11RenderTargetView * rendertarget,
 	ImageBuffer * depthbuffer, ovrRecti vp) {
-	float black[] = { 0, 0, 0, 1}; 
+	float black[] = { 0, 0, 0, 0}; 
 	g_pImmediateContext->OMSetRenderTargets(1, &rendertarget, depthbuffer->TexDsv);
 	g_pImmediateContext->ClearRenderTargetView(rendertarget, black);
 	g_pImmediateContext->ClearDepthStencilView(depthbuffer->TexDsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
@@ -321,7 +313,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	d3d11cfg.D3D11.pDevice = g_pd3dDevice;
 	d3d11cfg.D3D11.pDeviceContext = g_pImmediateContext;
 	d3d11cfg.D3D11.pBackBufferRT = g_pRenderTargetView;
-	d3d11cfg.D3D11.pSwapChain = g_pSwapChain;
+	d3d11cfg.D3D11.pSwapChain = g_pSwapChain1;
 
 	if (!ovrHmd_ConfigureRendering(HMD, &d3d11cfg.Config,
 		ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette |
@@ -338,7 +330,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	MSG msg = { 0 };
 	while (WM_QUIT != msg.message) {
 
-		SetWindowPos(g_hWnd, HWND_TOPMOST, HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h, NULL);
+		//SetWindowPos(g_hWnd, HWND_TOPMOST, HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h, NULL);
 
 		//updatekinect stuff
 		update();
@@ -371,33 +363,24 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 //--------------------------------------------------------------------------------------
 HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow) {
 	// Register class
-	WNDCLASSEX wcex;
-	wcex.cbSize = sizeof(WNDCLASSEX);
-	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = WndProc;
-	wcex.cbClsExtra = 0;
-	wcex.cbWndExtra = 0;
-	wcex.hInstance = hInstance;
-	wcex.hIcon = LoadIcon(hInstance, (LPCTSTR)"Tutorial06");
-	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wcex.lpszMenuName = nullptr;
-	wcex.lpszClassName = L"TutorialWindowClass";
-	wcex.hIconSm = 0;
-	if (!RegisterClassEx(&wcex))
+	WNDCLASS wc = {};
+	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wc.hInstance = hInstance;
+	wc.lpszClassName = L"window";
+	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = WndProc;
+	if (!RegisterClass(&wc))
 		return E_FAIL;
 
 	// Create window 
 	g_hInst = hInstance;
-	g_hWnd = CreateWindowEx(WS_EX_LAYERED, L"TutorialWindowClass", L"Direct3D 11 Tutorial 6",
-		WS_POPUP | WS_GROUP,
-				HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h, nullptr, nullptr, hInstance,
-				nullptr);
-	//SetWindowLong(g_hWnd, GWL_EXSTYLE, GetWindowLong(g_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+	//0x00200000L = WS_EX_NOREDIRECTIONBITMAP
 
-	// Make red pixels transparent:
-	SetLayeredWindowAttributes(g_hWnd, RGB(0, 0, 0), 100, LWA_COLORKEY);
-	//SetLayeredWindowAttributes(g_hWnd, RGB(0, 0, 0), 100, LWA_ALPHA);
+	g_hWnd = CreateWindowEx(0x00200000L,
+		wc.lpszClassName, L"Sample",
+		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		HMD->WindowsPos.x, HMD->WindowsPos.y, HMD->Resolution.w, HMD->Resolution.h,
+		nullptr, nullptr, hInstance, nullptr);
 
 	if (!g_hWnd)
 		return E_FAIL;
@@ -457,7 +440,7 @@ HRESULT InitDevice(ovrSizei size) {
 
 	UINT createDeviceFlags = 0;
 #ifdef _DEBUG
-	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #endif
 
 	D3D_DRIVER_TYPE driverTypes[] =
@@ -471,9 +454,6 @@ HRESULT InitDevice(ovrSizei size) {
 	D3D_FEATURE_LEVEL featureLevels[] =
 	{
 		D3D_FEATURE_LEVEL_11_1,
-		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_1,
-		D3D_FEATURE_LEVEL_10_0,
 	};
 	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
 
@@ -482,12 +462,6 @@ HRESULT InitDevice(ovrSizei size) {
 		hr = D3D11CreateDevice(nullptr, g_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
 			D3D11_SDK_VERSION, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext);
 
-		if (hr == E_INVALIDARG) {
-			// DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
-			hr = D3D11CreateDevice(nullptr, g_driverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
-				D3D11_SDK_VERSION, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext);
-		}
-
 		if (SUCCEEDED(hr))
 			break;
 	}
@@ -495,15 +469,15 @@ HRESULT InitDevice(ovrSizei size) {
 		return hr;
 
 	// Obtain DXGI factory from device (since we used nullptr for pAdapter above)
-	IDXGIFactory1* dxgiFactory = nullptr;
+	IDXGIDevice* dxgiDevice = nullptr;
+	IDXGIFactory2* dxgiFactory = nullptr;
 	{
-		IDXGIDevice* dxgiDevice = nullptr;
 		hr = g_pd3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
 		if (SUCCEEDED(hr)) {
 			IDXGIAdapter* adapter = nullptr;
 			hr = dxgiDevice->GetAdapter(&adapter);
 			if (SUCCEEDED(hr)) {
-				hr = adapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory));
+				hr = adapter->GetParent(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory));
 				adapter->Release();
 			}
 			dxgiDevice->Release();
@@ -513,9 +487,7 @@ HRESULT InitDevice(ovrSizei size) {
 		return hr;
 
 	// Create swap chain
-	IDXGIFactory2* dxgiFactory2 = nullptr;
-	hr = dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2));
-	if (dxgiFactory2) {
+	if (dxgiFactory) {
 		// DirectX 11.1 or later
 		hr = g_pd3dDevice->QueryInterface(__uuidof(ID3D11Device1), reinterpret_cast<void**>(&g_pd3dDevice1));
 		if (SUCCEEDED(hr)) {
@@ -524,42 +496,24 @@ HRESULT InitDevice(ovrSizei size) {
 
 		DXGI_SWAP_CHAIN_DESC1 sd;
 		ZeroMemory(&sd, sizeof(sd));
+		sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+		sd.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
 		sd.Width = width;
 		sd.Height = height;
 		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		sd.SampleDesc.Count = 1;
-		sd.SampleDesc.Quality = 0;
 		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		sd.BufferCount = 1;
+		sd.BufferCount = 2;
+		//sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-		hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
-		if (SUCCEEDED(hr)) {
-			hr = g_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), reinterpret_cast<void**>(&g_pSwapChain));
-		}
+		hr = dxgiFactory->CreateSwapChainForComposition(g_pd3dDevice, &sd, nullptr, &g_pSwapChain1);
 
-		dxgiFactory2->Release();
+		dxgiFactory->Release();
 	}
-	else {
-		// DirectX 11.0 systems
-		DXGI_SWAP_CHAIN_DESC sd;
-		ZeroMemory(&sd, sizeof(sd));
-		sd.BufferCount = 1;
-		sd.BufferDesc.Width = width;
-		sd.BufferDesc.Height = height;
-		sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		sd.BufferDesc.RefreshRate.Numerator = 60;
-		sd.BufferDesc.RefreshRate.Denominator = 1;
-		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		sd.OutputWindow = g_hWnd;
-		sd.SampleDesc.Count = 1;
-		sd.SampleDesc.Quality = 0;
-		sd.Windowed = TRUE;
-
-		hr = dxgiFactory->CreateSwapChain(g_pd3dDevice, &sd, &g_pSwapChain);
-	}
+	
 
 	// Note this tutorial doesn't handle full-screen swapchains so we block the ALT+ENTER shortcut
-	dxgiFactory->MakeWindowAssociation(g_hWnd, DXGI_MWA_NO_ALT_ENTER);
+	//dxgiFactory->MakeWindowAssociation(g_hWnd, DXGI_MWA_NO_ALT_ENTER);
 
 	dxgiFactory->Release();
 
@@ -568,7 +522,7 @@ HRESULT InitDevice(ovrSizei size) {
 
 	// Create a render target view
 	ID3D11Texture2D* pBackBuffer = nullptr;
-	hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer));
+	hr = g_pSwapChain1->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer));
 	if (FAILED(hr))
 		return hr;
 
@@ -665,20 +619,6 @@ HRESULT InitDevice(ovrSizei size) {
 	if (FAILED(hr))
 		return hr;
 
-	// Compile the pixel shader
-	pPSBlob = nullptr;
-	hr = CompileShaderFromFile(L"Tutorial06.fx", "PSSolid", "ps_4_0", &pPSBlob);
-	if (FAILED(hr)) {
-		MessageBox(nullptr,
-			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
-		return hr;
-	}
-
-	// Create the pixel shader
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &g_pPixelShaderSolid);
-	pPSBlob->Release();
-	if (FAILED(hr))
-		return hr;
 
 	
 	//vertex buffer
@@ -742,6 +682,45 @@ HRESULT InitDevice(ovrSizei size) {
 	if (FAILED(hr))
 		return hr;
 
+	//comp device
+	DCompositionCreateDevice(dxgiDevice, __uuidof(dcompDevice), reinterpret_cast<void **>(&dcompDevice));
+
+	IDCompositionTarget* target;
+	dcompDevice->CreateTargetForHwnd(g_hWnd,
+		true, // Top most
+		&target);
+
+	IDCompositionVisual* visual;
+	dcompDevice->CreateVisual(&visual);
+
+	visual->SetContent(g_pSwapChain1);
+	target->SetRoot(visual);
+	dcompDevice->Commit();
+
+	//blending
+	D3D11_BLEND_DESC blendStateDesc;
+	ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
+	blendStateDesc.AlphaToCoverageEnable = FALSE;
+	blendStateDesc.IndependentBlendEnable = FALSE;
+	blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+	blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+	blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+	blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+	blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+	ID3D11BlendState *blendState;
+
+	g_pd3dDevice->CreateBlendState(&blendStateDesc, &blendState);
+
+
+	float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	UINT sampleMask = 0xffffffff;
+
+	g_pImmediateContext->OMSetBlendState(blendState, blendFactor, sampleMask);
+
 	// Initialize the world matrices
 	g_World = XMMatrixIdentity();
 
@@ -755,8 +734,8 @@ HRESULT InitDevice(ovrSizei size) {
 	if (head_pos_from_kinect_ptr != 0)
 		Eye = XMVectorSet(head_pos_from_kinect.X, head_pos_from_kinect.Y, head_pos_from_kinect.Z, 0.0f);
 
-	Eye = XMVectorSet(-0.2f, 0.1f, -1.9f, 0.0f);
-	XMVECTOR At = XMVectorSet(-0.2f, 0.1f, 0.0f, 0.0f);
+	Eye = XMVectorSet(0.0f, -0.21f, -1.9f, 0.0f);
+	XMVECTOR At = XMVectorSet(0.0f, -0.21f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	g_View = XMMatrixLookAtLH(Eye, At, Up);
 
@@ -781,7 +760,6 @@ void CleanupDevice() {
 	if (g_pDepthStencilView) g_pDepthStencilView->Release();
 	if (g_pRenderTargetView) g_pRenderTargetView->Release();
 	if (g_pSwapChain1) g_pSwapChain1->Release();
-	if (g_pSwapChain) g_pSwapChain->Release();
 	if (g_pImmediateContext1) g_pImmediateContext1->Release();
 	if (g_pImmediateContext) g_pImmediateContext->Release();
 	if (g_pd3dDevice1) g_pd3dDevice1->Release();
@@ -877,21 +855,27 @@ void Render(const ovrPosef & ovrPose, const ovrMatrix4f & ovrProjection) {
 	cb1.mWorld = XMMatrixTranspose(g_World);
 
 	XMMATRIX pose = toXM(ovrPose);
-
+	   
 	//set g_view errtime TEMPORARY CODE
-	//XMVECTOR Eye;
-	//CameraSpacePoint head_pos_from_kinect;//round about stuff (ptr) to enable returning null, ughh
-	//CameraSpacePoint *head_pos_from_kinect_ptr = &head_pos_from_kinect;
-	//get_head_position(head_pos_from_kinect_ptr);
-	//
+	XMVECTOR Eye;
+	CameraSpacePoint head_pos_from_kinect;//round about stuff (ptr) to enable returning null, ughh
+	CameraSpacePoint *head_pos_from_kinect_ptr = &head_pos_from_kinect;
+	get_head_position(head_pos_from_kinect_ptr);
+
+	float x, y, z;
+	x = -0.2;
+	y = 0.1;
+	z = -1.2;
+
+	Eye = XMVectorSet(0.1f, -0.02f, -2.2f, 0.0f);
+	//Eye = XMVectorSet(x, y, z, 0.0f);
 	//if (head_pos_from_kinect_ptr != 0)
 	//	Eye = XMVectorSet(head_pos_from_kinect.X, head_pos_from_kinect.Y, head_pos_from_kinect.Z, 0.0f);
 	//else
 	//	Eye = XMVectorSet(-0.1f, 0.08f, -2.2f, 0.0f);
-	//XMVECTOR At = XMVectorSet(6.0f, 0.0f, -2.0f, 0.0f);
-	//XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	//g_View = XMMatrixLookAtLH(Eye, At, Up);
-	//END OF TEMPORARY CODE
+	XMVECTOR At = XMVectorSet(0.1f, -0.02f, 0.0f, 0.0f);
+	XMVECTOR Up = XMVectorSet(x, 100.0f, z, 0.0f);
+	g_View = XMMatrixLookAtLH(Eye, At, Up);
 
 
  	XMMATRIX currentView = XMMatrixMultiply(g_View, pose);
@@ -905,7 +889,6 @@ void Render(const ovrPosef & ovrPose, const ovrMatrix4f & ovrProjection) {
 	cb1.vLightDir[1] = vLightDirs[1];
 	cb1.vLightColor[0] = vLightColors[0];
 	cb1.vLightColor[1] = vLightColors[1];
-	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 1);
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
 
 	//
