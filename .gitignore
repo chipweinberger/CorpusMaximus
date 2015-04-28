@@ -1,2 +1,9 @@
 *.opensdf
 *.sdf
+Debug/
+*.vcxproj.filters
+*.vcxproj.user
+*.lib
+*.aps
+*.suo
+*.vcxproj
